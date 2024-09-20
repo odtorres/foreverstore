@@ -23,6 +23,25 @@ func TestPathTransformFunc(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	opts := StoreOpts{
+		PathTransformFunc: CASPathTransformFunc,
+	}
+
+	s := NewStore(opts)
+	key := "myspecialpicture"
+	data := []byte("some data")
+
+	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+		t.Errorf("Error writing stream: %s", err)
+	}
+
+	if err := s.Delete(key); err != nil {
+		t.Errorf("Error deleting key: %s", err)
+	}
+
+}
+
 func TestStore(t *testing.T) {
 	opts := StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
@@ -34,6 +53,10 @@ func TestStore(t *testing.T) {
 
 	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
 		t.Errorf("Error writing stream: %s", err)
+	}
+
+	if !s.Has(key) {
+		t.Errorf("Key not found")
 	}
 
 	r, err := s.Read(key)
@@ -49,4 +72,6 @@ func TestStore(t *testing.T) {
 	}
 
 	fmt.Println(string(b))
+
+	s.Delete(key)
 }
