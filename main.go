@@ -1,38 +1,37 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"time"
 
 	"github.com/odtorres/foreverstore/p2p"
 )
 
-func OnPeer(p2p.Peer) error {
-	fmt.Println("Doing some logic with the peer outside of TCPTransport")
-	return nil
-}
-
 func main() {
-	tcpOpts := p2p.TCPTransportOpts{
+
+	tcpTransportOPts := p2p.TCPTransportOpts{
 		ListenAddress:  ":3000",
 		HandshakerFunc: p2p.NOPHandshakeFunc,
 		Decoder:        p2p.DefaultDecoder{},
-		OnPeer:         OnPeer,
+		//todo on peer func
 	}
-	tr := p2p.NewTCPTransport(tcpOpts)
+
+	tcpTransport := p2p.NewTCPTransport(tcpTransportOPts)
+
+	fileServerOpts := FileServerOpts{
+		StorageRoot:       "3000_network",
+		PathTransformFunc: CASPathTransformFunc,
+		Transport:         tcpTransport,
+	}
+
+	s := NewFileServer(fileServerOpts)
 
 	go func() {
-		for {
-			rpc := <-tr.Consume()
-			fmt.Printf("Received RPC: %+v\n", rpc)
-		}
+		time.Sleep(3 * time.Second)
+		s.Stop()
 	}()
 
-	if err := tr.ListenerAndAccept(); err != nil {
-		log.Fatalf("Error listening and accepting: %s", err)
+	if err := s.Start(); err != nil {
+		log.Fatal(err)
 	}
-
-	fmt.Println("Listening on", tr.ListenAddress)
-
-	select {}
 }

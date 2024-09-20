@@ -1,8 +1,10 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"reflect"
 	"sync"
@@ -57,19 +59,40 @@ func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcch
 }
 
-func (t *TCPTransport) ListenerAndAccept() error {
+func (t *TCPTransport) Close() error {
+	/* t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for _, p := range t.peers {
+		p.Close()
+	} */
+
+	if t.listener != nil {
+		return t.listener.Close()
+	}
+
+	return nil
+}
+
+func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listener, err = net.Listen("tcp", t.ListenAddress)
 	if err != nil {
 		return err
 	}
 	go t.startAcceptLoop()
+
+	log.Printf("Listening on %s\n", t.ListenAddress)
+
 	return nil
 }
 
 func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
+		if errors.Is(err, net.ErrClosed) {
+			return
+		}
 		if err != nil {
 			fmt.Printf("TCP accept errir:%s\n", err)
 		}

@@ -8,6 +8,7 @@ type Peer interface {
 // transport is any thing that handles the communication
 // between the nodes in the network. This can be of the form (TCM UDP, websocket, etc)
 type Transport interface {
-	listenAndAccept() error
+	ListenAndAccept() error
 	Consume() <-chan RPC
+	Close() error
 }
