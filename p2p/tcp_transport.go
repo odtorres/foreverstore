@@ -2,7 +2,9 @@ package p2p
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"reflect"
 	"sync"
 )
 
@@ -31,6 +33,7 @@ type TCPTransportOpts struct {
 	ListenAddress  string
 	HandshakerFunc HandshakerFunc
 	Decoder        Decoder
+	OnPeer         func(Peer) error
 }
 
 type TCPTransport struct {
@@ -78,6 +81,13 @@ func (t *TCPTransport) startAcceptLoop() {
 }
 
 func (t *TCPTransport) handleConn(conn net.Conn) {
+	var err error
+
+	defer func() {
+		fmt.Printf("Closing peer connection %s", err)
+		conn.Close()
+	}()
+
 	peer := NewTCPPeer(conn, true)
 
 	if err := t.HandshakerFunc(peer); err != nil {
@@ -86,12 +96,25 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		return
 	}
 
+	if t.OnPeer != nil {
+		if err := t.OnPeer(peer); err != nil {
+			fmt.Printf("TCP OnPeer error: %s\n", err)
+			return
+		}
+	}
+
 	rpc := RPC{}
 	for {
-		if err := t.Decoder.Decode(conn, &rpc); err != nil {
-			fmt.Printf("TCP Error decoding message: %s\n", err)
-			fmt.Printf("Closing connection from %+v\n", conn.RemoteAddr())
+		err := t.Decoder.Decode(conn, &rpc)
+
+		fmt.Println(reflect.TypeOf(err))
+		if err == io.EOF {
+			fmt.Printf("TCP Connection closed by remote peer: %+v\n", conn.RemoteAddr())
 			return
+		}
+		if err != nil {
+			fmt.Printf("TCP Error decoding message: %s\n", err)
+			continue
 		}
 		rpc.From = conn.RemoteAddr()
 		fmt.Printf("Received message: %+v\n", rpc)
